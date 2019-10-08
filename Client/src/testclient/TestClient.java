@@ -23,6 +23,7 @@ public class TestClient {
     private static int lines = -1;
     private static int columns = -1;
     private static String cache = "";
+    private static boolean pasta = false;
 
     public static void main(String[] args) {
         if (args.length > 1) {
@@ -78,10 +79,16 @@ public class TestClient {
             execute("stty raw </dev/tty");
             while(!receiver.stopped) {
                 String str;
-                if ((str = read()).trim().equals("/exit") || lastSymbol == 4) {
+                if ((str = read()).trim().equals("/exit") || lastSymbol == 4 || lastSymbol == 3) {
                     out.println("\0");
                     break;
                 }
+
+                if (str.trim().equals("/pasta")) {
+                    pasta = true;
+                    line = lines;
+                }
+                if (str.trim().equals("/unpasta")) pasta = false;
 
                 out.println(str);
             }
@@ -122,17 +129,18 @@ public class TestClient {
             for(int i = 0; i < k; ++i) {
                 String m = (i < k - 1) ? s.substring(i * columns, (i + 1) * columns) : s.substring(i * columns);
                 if (TestClient.lines > 0 && line > TestClient.lines) {
-                    execute("echo -ne '\\e[" + line + ";1H\\e[S\\e[2K';echo -ne '" + m + "';echo -ne '\\e[1;1H\\e[2K" + builder.toString() + "'");
+                    execute("echo -ne '\\e[" + line + ";1H\\e[S\\e[2K';echo -ne '" + m + "'");
                 } else {
-                    execute("echo -ne '\\e[" + line + ";1H\\e[2K';echo -ne '" + m + "';echo -ne '\\e[1;1H\\e[2K" + builder.toString() + "'");
+                    execute("echo -ne '\\e[" + line + ";1H\\e[2K';echo -ne '" + m + "'");
                     ++line;
                 }
             }
         }
+        execute("echo -ne '\\e[1;1H\\e[2K" + toEscapedString(builder) + "'");
 
     }
 
-    private static String read() throws IOException, InterruptedException {
+    private static String read() throws IOException {
         while(true) {
             lastSymbol = System.in.read();
 
@@ -142,14 +150,7 @@ public class TestClient {
                 continue;
             }
 
-            if (lastSymbol == 10 || lastSymbol == 13 || lastSymbol == 4 || lastSymbol == 3) {
-                String str = builder.toString();
-                builder = new StringBuilder();
-//                Thread.sleep(100);
-                return str;
-            }
-
-            if (lastSymbol == 127) {
+            if (lastSymbol == 127 || lastSymbol == 8) {
                 execute("echo -ne '\\e[3D\\e[K'");
                 if (builder.length() > 0) {
                     builder.delete(builder.length() - 1, builder.length());
@@ -164,7 +165,21 @@ public class TestClient {
                 continue;
             }
 
-            builder.append( (char) lastSymbol);
+            if ( pasta && lastSymbol == 13 ) {
+                builder.append("\r\n");
+                continue;
+            }
+
+            boolean endOfMessage = lastSymbol == 12 || lastSymbol == 3 || lastSymbol == 4 ||
+                    !pasta && (lastSymbol == 10 || lastSymbol == 13);
+
+            if (endOfMessage) {
+                String str = builder.toString();
+                builder = new StringBuilder();
+                return str;
+            }
+
+            builder.append( (char) lastSymbol );
         }
     }
 
@@ -172,10 +187,7 @@ public class TestClient {
         Process proc = Runtime.getRuntime().exec(new String[]{"bash", "-c", command});
         Scanner sc = new Scanner(proc.getInputStream());
 
-        while(sc.hasNextLine()) {
-            System.out.print(sc.nextLine());
-        }
-
+        while (sc.hasNextLine()) System.out.print(sc.nextLine());
     }
 
     private static void printFinish() {
@@ -185,6 +197,10 @@ public class TestClient {
             e.printStackTrace();
         }
 
+    }
+
+    private static String toEscapedString(StringBuilder sb) {
+        return sb.toString().replaceAll("\\n", "\n\\\\e[E\\\\e[2K");
     }
 
     private static class Receiver extends Thread {

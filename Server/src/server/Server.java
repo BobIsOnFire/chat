@@ -58,12 +58,12 @@ public class Server {
         buffer.flip();
         byte[] bytes = new byte[buffer.limit()];
         buffer.get(bytes);
-        String name = (new String(bytes)).trim().replaceAll("\\\\", "/").replaceAll("'", "\"");
+        String name = (new String(bytes)).trim().replaceAll("\\\\", "^").replaceAll("'", "\"");
         buffer.clear();
 
         socket.configureBlocking(false);
         Map<String, String> map = new HashMap<>();
-        int color = 1 + (int) (Math.random() * 6);
+        int color = (int) (Math.random() * 255);
 
         map.put("name", name);
         map.put("pasta", "false");
@@ -99,7 +99,7 @@ public class Server {
 
         if (message.trim().equals("/pasta")) {
             map.put("pasta", "true");
-            socket.write( ByteBuffer.wrap("--- Pasta mode activated ---\n".getBytes()) );
+            socket.write( ByteBuffer.wrap("--- Pasta mode enabled ---\nUse ^L to send a message\n".getBytes()) );
             return;
         }
 
@@ -111,19 +111,18 @@ public class Server {
 
         if (message.trim().startsWith("/color")) {
             String[] tokens = message.split("\\s+");
-            if (tokens.length < 2 || !tokens[1].matches("\\d+") || Integer.parseInt(tokens[1]) < 1 || Integer.parseInt(tokens[1]) > 7) {
-                socket.write( ByteBuffer.wrap("Please set color argument: number from 1 to 7\n".getBytes()) );
+            if (tokens.length < 2 || !tokens[1].matches("\\d+") || Integer.parseInt(tokens[1]) < 0 || Integer.parseInt(tokens[1]) > 255) {
+                socket.write( ByteBuffer.wrap("Please set color argument: number from 0 to 255.\n".getBytes()) );
                 return;
             }
 
             map.put("color", tokens[1]);
-            String notify = "--- \\e[3" + tokens[1] + "mColor changed\\e[39m ---\n";
+            String notify = "--- \\e[38;5;" + tokens[1] + "mColor changed\\e[39m ---\n";
             socket.write( ByteBuffer.wrap(notify.getBytes()) );
             return;
         }
 
         // todo !online
-        // todo buffer lines... somehow ehh
 
         String msg;
         boolean pasta = Boolean.parseBoolean(map.get("pasta"));
@@ -168,6 +167,6 @@ public class Server {
     }
 
     private static String coloredName(String name, String color) {
-        return "\\e[3" + color + "m" + name + "\\e[39m";
+        return "\\e[38;5;" + color + "m" + name + "\\e[39m";
     }
 }
