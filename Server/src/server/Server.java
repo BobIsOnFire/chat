@@ -15,6 +15,12 @@ public class Server {
     private static Selector selector;
     private static ByteBuffer buffer = ByteBuffer.allocate(256);
 
+    private static final String clientJoin = "Подключен к серверу чата.\nВведите ваш ник: ";
+    private static final String clientChatEnter = "Добро пожаловать в чат.\nИспользуйте /exit для выхода.\n";
+    private static final String pastaModeEnabled = "--- Режим пасты включен ---\nИспользуйте ^L (Ctrl-L) для отправки сообщения\n";
+    private static final String pastaModeDisabled = "--- Режим пасты выключен ---\n";
+    private static final String wrongColorAttribute = "Введите значение для цвета текста: число от 0 до 255.\n";
+
     public static void main(String[] args) {
         try {
             serverChannel = ServerSocketChannel.open();
@@ -22,7 +28,8 @@ public class Server {
             serverChannel.configureBlocking(false);
             selector = Selector.open();
             serverChannel.register(selector, SelectionKey.OP_ACCEPT);
-            System.out.println("Opening server on " + InetAddress.getLocalHost() + ":" + serverChannel.socket().getLocalPort());
+            System.out.println("Открываю сервер по адресу " + InetAddress.getLocalHost() +
+                    ":" + serverChannel.socket().getLocalPort());
             while(serverChannel.isOpen()) {
                 selector.select();
                 Iterator iter = selector.selectedKeys().iterator();
@@ -49,8 +56,8 @@ public class Server {
         SocketChannel socket = ((ServerSocketChannel)key.channel()).accept();
         String address = socket.socket().getInetAddress().toString() + ":" + socket.socket().getPort();
 
-        System.out.println("Accepted connection from: " + address);
-        ByteBuffer invitationBuffer = ByteBuffer.wrap(clientJoinMessage().getBytes());
+        System.out.println("Принято соединение от: " + address);
+        ByteBuffer invitationBuffer = ByteBuffer.wrap(clientJoin.getBytes());
         socket.write(invitationBuffer);
 
         buffer.clear();
@@ -70,9 +77,9 @@ public class Server {
         map.put("color", Integer.toString(color));
         socket.register(selector, SelectionKey.OP_READ, map);
 
-        invitationBuffer = ByteBuffer.wrap(clientChatEnterMessage().getBytes());
+        invitationBuffer = ByteBuffer.wrap(clientChatEnter.getBytes());
         socket.write(invitationBuffer);
-        broadcast( coloredName(name, Integer.toString(color)) + " joined the chat.\n");
+        broadcast( coloredName(name, Integer.toString(color)) + " вошел в чат.\n");
     }
 
     private static void handleRead(SelectionKey key) throws IOException {
@@ -95,40 +102,43 @@ public class Server {
             read = -1;
         }
 
-        String message = sb.toString().replaceAll("\\\\", "^").replaceAll("'", "\"");
+        String message = sb.toString().replaceAll("\\\\", "^").replaceAll("'", "\""); // todo arrow keys handling
 
         if (message.trim().equals("/pasta")) {
             map.put("pasta", "true");
-            socket.write( ByteBuffer.wrap("--- Pasta mode enabled ---\nUse ^L to send a message\n".getBytes()) );
+            socket.write(ByteBuffer.wrap( pastaModeEnabled.getBytes()) );
             return;
         }
 
         if (message.trim().equals("/unpasta")) {
             map.put("pasta", "false");
-            socket.write( ByteBuffer.wrap("--- Pasta mode disabled ---\n".getBytes()) );
+            socket.write( ByteBuffer.wrap( pastaModeDisabled.getBytes()) );
             return;
         }
 
         if (message.trim().startsWith("/color")) {
             String[] tokens = message.split("\\s+");
             if (tokens.length < 2 || !tokens[1].matches("\\d+") || Integer.parseInt(tokens[1]) < 0 || Integer.parseInt(tokens[1]) > 255) {
-                socket.write( ByteBuffer.wrap("Please set color argument: number from 0 to 255.\n".getBytes()) );
+                socket.write( ByteBuffer.wrap( wrongColorAttribute.getBytes()) );
                 return;
             }
 
             map.put("color", tokens[1]);
-            String notify = "--- \\e[38;5;" + tokens[1] + "mColor changed\\e[39m ---\n";
+            String notify = "--- \\e[38;5;" + tokens[1] + "mЦвет изменен\\e[39m ---\n";
             socket.write( ByteBuffer.wrap(notify.getBytes()) );
             return;
         }
 
-        // todo !online
+        // todo /online
+        // todo smiles
+        // todo ascii generator (possibly with loading pictures from online)
+        // todo bash client?? is that possible??
 
         String msg;
         boolean pasta = Boolean.parseBoolean(map.get("pasta"));
         if (message.equals("\0\n") || read < 0) {
             socket.close();
-            msg = name + " left the chat.\n";
+            msg = name + " покинул чат.\n";
         } else {
             msg = (pasta ? "" : name + ": ") + message;
         }
@@ -156,14 +166,6 @@ public class Server {
         while(sc.hasNextLine()) {
             System.out.println(sc.nextLine());
         }
-    }
-
-    private static String clientJoinMessage() {
-        return "Connected to Chat server.\nEnter your nickname: ";
-    }
-
-    private static String clientChatEnterMessage() {
-        return "Welcome to Chat. Some rights reserved.\nUse /exit to leave the chat.\n";
     }
 
     private static String coloredName(String name, String color) {
