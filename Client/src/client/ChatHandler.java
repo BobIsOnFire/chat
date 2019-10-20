@@ -1,4 +1,4 @@
-package testclient;
+package client;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -8,7 +8,7 @@ import java.net.Socket;
 import java.nio.CharBuffer;
 import java.util.Scanner;
 
-import static testclient.Executor.*;
+import static client.Executor.*;
 
 class ChatHandler {
     private Socket socket;

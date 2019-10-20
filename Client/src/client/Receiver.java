@@ -1,11 +1,11 @@
-package testclient;
+package client;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.nio.CharBuffer;
 import java.util.Arrays;
 
-import static testclient.Executor.*;
+import static client.Executor.*;
 
 public class Receiver extends Thread {
     int lines;

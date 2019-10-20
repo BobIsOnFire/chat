@@ -3,14 +3,19 @@ package server;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 
-public class Server {
+public class ServerMain {
     private static ServerSocketChannel serverChannel;
     private static Selector selector;
     private static ByteBuffer buffer = ByteBuffer.allocate(256);
@@ -20,6 +25,11 @@ public class Server {
     private static final String pastaModeEnabled = "--- Режим пасты включен ---\nИспользуйте ^L (Ctrl-L) для отправки сообщения\n";
     private static final String pastaModeDisabled = "--- Режим пасты выключен ---\n";
     private static final String wrongColorAttribute = "Введите значение для цвета текста: число от 0 до 255.\n";
+    private static final String noPathAttribute = "Введите путь к файлу изображения.\n";
+    private static final String invalidURL = "Введите корректный URL или путь к файлу.\n";
+    private static final String wrongURLFileType = "По данному адресу изображения не существует.\n";
+
+    private static final int BASIC_CONSOLE_WIDTH = 100;
 
     public static void main(String[] args) {
         try {
@@ -119,7 +129,7 @@ public class Server {
         if (message.trim().startsWith("/color")) {
             String[] tokens = message.split("\\s+");
             if (tokens.length < 2 || !tokens[1].matches("\\d+") || Integer.parseInt(tokens[1]) < 0 || Integer.parseInt(tokens[1]) > 255) {
-                socket.write( ByteBuffer.wrap( wrongColorAttribute.getBytes()) );
+                socket.write( ByteBuffer.wrap( wrongColorAttribute.getBytes() ) );
                 return;
             }
 
@@ -129,21 +139,59 @@ public class Server {
             return;
         }
 
-        // todo /online
-        // todo smiles
-        // todo ascii generator (possibly with loading pictures from online)
-        // todo bash client?? is that possible??
+        if (message.trim().startsWith("/pic2ascii")) {
+            String[] tokens = message.split("\\s+");
+            if (tokens.length < 2) {
+                socket.write( ByteBuffer.wrap( noPathAttribute.getBytes() ) );
+                return;
+            }
 
-        String msg;
+            URL url;
+            try {
+                url = new URL(tokens[1]);
+            } catch (MalformedURLException exc) {
+                Path path = Paths.get(tokens[1]);
+                if (!Files.exists(path)) {
+                    socket.write( ByteBuffer.wrap( invalidURL.getBytes() ) );
+                    return;
+                }
+                url = path.toUri().toURL();
+            }
+
+            try {
+                int consoleWidth;
+                if (tokens.length < 3) {
+                    consoleWidth = BASIC_CONSOLE_WIDTH;
+                } else {
+                    consoleWidth = Integer.parseInt(tokens[2]);
+                }
+
+                ASCIIImageScanner scanner = new ASCIIImageScanner(url, consoleWidth);
+                String response = name + ": Картинка по адресу " + tokens[1] + "\n";
+                broadcast(response);
+                while (scanner.hasNextLine()) broadcast(scanner.nextLine());
+                return;
+            } catch (IOException exc) {
+                socket.write( ByteBuffer.wrap( wrongURLFileType.getBytes() ) );
+                return;
+            }
+        }
+
+        // todo /online
+        // todo smiles in ansi-graphics (16x16)
+        // todo bash client?? is that possible?
+        // todo fix lagging on new user enter
+
+        String response;
         boolean pasta = Boolean.parseBoolean(map.get("pasta"));
         if (message.equals("\0\n") || read < 0) {
             socket.close();
-            msg = name + " покинул чат.\n";
+            response = name + " покинул чат.\n";
         } else {
-            msg = (pasta ? "" : name + ": ") + message;
+            response = (pasta ? "" : name + ": ") + message;
         }
 
-        broadcast(msg);
+        broadcast(response);
     }
 
     private static void broadcast(String message) throws IOException {
