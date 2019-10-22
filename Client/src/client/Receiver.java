@@ -57,7 +57,7 @@ public class Receiver extends Thread {
         }
     }
 
-    private void print(String message) throws IOException {
+    private void print(String message) {
         String[] messageLines = (message + " ").split("\n");
         messageLines[0] = cache + messageLines[0];
         cache = messageLines[messageLines.length - 1];
@@ -65,26 +65,26 @@ public class Receiver extends Thread {
         messageLines = Arrays.copyOf(messageLines, messageLines.length - 1);
 
         for(String s: messageLines) {
-            int k = s.length() / columns + 1;
+            if (s.startsWith("\u001B")) {
+                writeLine(s);
+                continue;
+            }
 
+            int k = s.length() / columns + 1;
             for(int i = 0; i < k; ++i) {
                 String lineContent = (i < k - 1) ? s.substring(i * columns, (i + 1) * columns) : s.substring(i * columns);
-                if (lines > 0 && line > lines) {
-                    String cmd =
-                            String.format("echo -ne '%s%s%s';", MOVE_LINE(line), SCROLL_UP, CLEAR_LINE) +
-                            String.format("echo -ne '%s'", lineContent);
-                    execute(cmd);
-
-                } else {
-                    String cmd =
-                            String.format("echo -ne '%s%s';", MOVE_LINE(line), CLEAR_LINE) +
-                            String.format("echo -ne '%s'", lineContent);
-                    execute(cmd);
-                    ++line;
-                }
+                writeLine(lineContent);
             }
         }
-        String cmd = String.format("echo -ne '%s%s%s'", MOVE_LINE(1), CLEAR_LINE, builder.toString());
-        execute(cmd);
+        System.out.print(MOVE_LINE(1) + CLEAR_LINE + builder.toString());
+    }
+
+    private void writeLine(String lineContent) {
+        if (lines > 0 && line > lines) {
+            System.out.print(MOVE_LINE(line) + SCROLL_UP + CLEAR_LINE + lineContent);
+        } else {
+            System.out.print(MOVE_LINE(line) + CLEAR_LINE + lineContent);
+            ++line;
+        }
     }
 }

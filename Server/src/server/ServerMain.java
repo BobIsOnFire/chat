@@ -1,5 +1,9 @@
 package server;
 
+import server.scanner.AnsiImageScanner;
+import server.scanner.AsciiImageScanner;
+import server.scanner.ImageScanner;
+
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -28,6 +32,7 @@ public class ServerMain {
     private static final String noPathAttribute = "Введите путь к файлу изображения.\n";
     private static final String invalidURL = "Введите корректный URL или путь к файлу.\n";
     private static final String wrongURLFileType = "По данному адресу изображения не существует.\n";
+    private static final String invalidImageSize = "Изображение слишком велико для ANSI-графики (жертвуем возможностями ради скорости).\n";
 
     private static final int BASIC_CONSOLE_WIDTH = 100;
 
@@ -134,12 +139,12 @@ public class ServerMain {
             }
 
             map.put("color", tokens[1]);
-            String notify = "--- \\e[38;5;" + tokens[1] + "mЦвет изменен\\e[39m ---\n";
+            String notify = "--- \u001B[38;5;" + tokens[1] + "mЦвет изменен\u001B[39m ---\n";
             socket.write( ByteBuffer.wrap(notify.getBytes()) );
             return;
         }
 
-        if (message.trim().startsWith("/pic2ascii")) {
+        if (message.trim().startsWith("/pic2")) {
             String[] tokens = message.split("\\s+");
             if (tokens.length < 2) {
                 socket.write( ByteBuffer.wrap( noPathAttribute.getBytes() ) );
@@ -166,14 +171,21 @@ public class ServerMain {
                     consoleWidth = Integer.parseInt(tokens[2]);
                 }
 
-                ASCIIImageScanner scanner = new ASCIIImageScanner(url, consoleWidth);
+                ImageScanner scanner;
+                if (message.trim().startsWith("/pic2ascii")) {
+                    scanner = new AsciiImageScanner(url, consoleWidth);
+                } else scanner = new AnsiImageScanner(url, consoleWidth);
+
                 String response = name + ": Картинка по адресу " + tokens[1] + "\n";
                 broadcast(response);
+
                 while (scanner.hasNextLine()) broadcast(scanner.nextLine());
                 return;
             } catch (IOException exc) {
                 socket.write( ByteBuffer.wrap( wrongURLFileType.getBytes() ) );
                 return;
+            } catch (RuntimeException exc) {
+                socket.write( ByteBuffer.wrap( invalidImageSize.getBytes() ) );
             }
         }
 
@@ -195,7 +207,7 @@ public class ServerMain {
     }
 
     private static void broadcast(String message) throws IOException {
-        execute("echo -ne '" + message + "'");
+        System.out.print(message);
         ByteBuffer broadcastBuffer = ByteBuffer.wrap(message.getBytes());
 
         for(SelectionKey key: selector.keys()) {
@@ -207,16 +219,7 @@ public class ServerMain {
         }
     }
 
-    private static void execute(String command) throws IOException {
-        Process proc = Runtime.getRuntime().exec(new String[]{"bash", "-c", command});
-        Scanner sc = new Scanner(proc.getInputStream());
-
-        while(sc.hasNextLine()) {
-            System.out.println(sc.nextLine());
-        }
-    }
-
     private static String coloredName(String name, String color) {
-        return "\\e[38;5;" + color + "m" + name + "\\e[39m";
+        return "\u001B[38;5;" + color + "m" + name + "\u001B[39m";
     }
 }

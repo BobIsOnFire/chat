@@ -41,7 +41,7 @@ public class ClientMain {
                     addressCorrect = false;
                 }
         }
-        ChatHandler handler = new ChatHandler(socket);
+        ClientHandler handler = new ClientHandler(socket);
         handler.runClient();
     }
 

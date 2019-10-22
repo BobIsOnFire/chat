@@ -10,7 +10,7 @@ import java.util.Scanner;
 
 import static client.Executor.*;
 
-class ChatHandler {
+class ClientHandler {
     private Socket socket;
     private BufferedReader in;
     private PrintWriter out;
@@ -20,8 +20,9 @@ class ChatHandler {
     private boolean cyrillic;
     private byte cyrillicBegin;
     private boolean pasta;
+    private boolean picmode;
 
-    ChatHandler(Socket socket) {
+    ClientHandler(Socket socket) {
         this.socket = socket;
         lastSymbol = 10;
         pasta = false;
@@ -43,9 +44,8 @@ class ChatHandler {
             System.out.print(chars);
             out.println(new Scanner(System.in).nextLine());
 
-            String cmd = String.format("echo -ne '%s%s'", CLEAR_SCREEN, MOVE_LINE(1));
-            execute(cmd);
-            execute("stty raw </dev/tty");
+            System.out.print(CLEAR_SCREEN + MOVE_LINE(1));
+            Runtime.getRuntime().exec(new String[]{"bash", "-c", "stty raw </dev/tty"});
 
             Receiver receiver = new Receiver(in, builder);
             receiver.start();
@@ -80,8 +80,9 @@ class ChatHandler {
             out.close();
             socket.close();
 
-            execute("stty cooked </dev/tty");
-            printFinish();
+            Runtime.getRuntime().exec(new String[]{"bash", "-c", "stty cooked </dev/tty"});
+
+            System.out.print(CLEAR_SCREEN + MOVE_LINE(1));
             System.out.println("Чат закрыт.");
         } catch (IOException e) {
             System.err.println("Потоки чата не закрыты.");
@@ -100,8 +101,7 @@ class ChatHandler {
             }
 
             if (lastSymbol == 127 || lastSymbol == 8) {
-                String cmd = String.format("echo -ne '%s'", DELETE_SYMBOLS(2));
-                execute(cmd);
+                System.out.print(DELETE_SYMBOLS(2));
                 if (builder.length() > 0) {
                     builder.delete(builder.length() - 1, builder.length());
                 }
@@ -132,14 +132,4 @@ class ChatHandler {
             builder.append( (char) lastSymbol );
         }
     }
-
-    private static void printFinish() {
-        try {
-            String cmd = String.format("echo -ne '%s%s'", CLEAR_SCREEN, MOVE_LINE(1));
-            execute(cmd);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
 }
