@@ -80,7 +80,7 @@ public class ServerMain {
         buffer.flip();
         byte[] bytes = new byte[buffer.limit()];
         buffer.get(bytes);
-        String name = (new String(bytes)).trim().replaceAll("\\\\", "^").replaceAll("'", "\"");
+        String name = (new String(bytes)).trim();
         buffer.clear();
 
         socket.configureBlocking(false);

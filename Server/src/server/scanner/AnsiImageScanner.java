@@ -17,6 +17,7 @@ public class AnsiImageScanner extends ImageScanner {
             image = resize(width, height);
         }
 
+        System.out.printf("Width: %d, Height: %d\n", image.getWidth(), image.getHeight());
     }
 
     public String nextLine() {
@@ -33,54 +34,64 @@ public class AnsiImageScanner extends ImageScanner {
         return i < image.getHeight();
     }
 
-    private String nextSymbolInLine() {
-        int pixel = image.getRGB(j, i);
+    public String charAt(int x, int y) {
+        return charAt(x, y, false);
+    }
 
-        int B = pixel & 0x000000FF;
-        int G = (pixel & 0x0000FF00) >> 8;
-        int R = (pixel & 0x00FF0000) >> 16;
+    private String charAt(int x, int y, boolean preserveColor) {
+        int pixel = image.getRGB(x, y);
 
-        int color;
-        if (R == G && R == B) color = greyScaleColor(R);
-        else if (R % 255 == 0 && G % 255 == 0 && B % 255 == 0) color = brightScaleColor(R, G, B);
-        else if (R % 128 == 0 && R % 128 == 0 && R % 128 == 0) color = paleScaleColor(R, G, B);
-        else color = cubeScaleColor(R, G, B);
+        int A = pixel >> 24 & 0x000000FF;
+
+        int B = (pixel & 0x000000FF) * A / 0xFF;
+        int G = (pixel >> 8 & 0x000000FF) * A / 0xFF;
+        int R = (pixel >> 16 & 0x000000FF) * A / 0xFF;
+
+        int color = determineColor(R, G, B);
 
         String symbol;
-        if (previousColor == color) symbol = "  ";
-        else symbol = "\u001B[48;5;" + color + "m  ";
+        if (preserveColor) {
+            if (previousColor == color) symbol = "  ";
+            else symbol = "\u001B[48;5;" + color + "m  ";
+            previousColor = color;
+        } else symbol = "\u001B[48;5;" + color + "m  \u001B[49m";
 
-        previousColor = color;
         j++;
+        if (!preserveColor) return String.format("%X\t%d\t%s", image.getRGB(x, y), color, symbol);
         return symbol;
+    }
+
+    private int determineColor(int R, int G, int B) {
+        if (R % 187 == 0 && G % 187 == 0 && B % 187 == 0)
+            return R / 187 + G * 2 / 187 + B * 4 / 187; // pale scale (0-7)
+
+        if ((R - 65) % 210 == 0 && (G - 65) % 210 == 0 && (B - 65) % 210 == 0)
+            return 8 + R / 255 + G * 2 / 255 + B * 4 / 255; // bright scale (8-15)
+
+        int r = (R + 4) / 5 * 5 - 2;
+        int g = (G + 4) / 5 * 5 - 2;
+        int b = (B + 4) / 5 * 5 - 2;
+
+        if (r == g && r == b) { // grey scale (232-255)
+            if (r < 8) return 0;
+            if (r > 243) return 15;
+
+            return 232 + (r - 8) / 10;
+        }
+
+        int cubeR = (r <= 48) ? 0 : Math.max(0, (r - 75) / 40 + 1);
+        int cubeG = (g <= 48) ? 0 : Math.max(0, (g - 75) / 40 + 1);
+        int cubeB = (b <= 48) ? 0 : Math.max(0, (b - 75) / 40 + 1);
+
+        return 16 + 36 * cubeR + 6 * cubeG + cubeB;
+    }
+
+    private String nextSymbolInLine() {
+        return charAt(j, i, true);
     }
 
     private boolean hasNextSymbolInLine() {
         return j < image.getWidth();
     }
 
-    private int greyScaleColor(int color) {
-        if (color == 0) return 0;
-        if (color == 128) return 8;
-        if (color == 192) return 7;
-        if (color == 255) return 15;
-
-        return 232 + (int) Math.floor(color / 256.0 * 24);
-    }
-
-    private int brightScaleColor(int r, int g, int b) {
-        return 8 + r / 255 + g * 2 / 255 + b * 4 / 255;
-    }
-
-    private int paleScaleColor(int r, int g, int b) {
-        return r / 128 + g * 2 / 128 + b * 4 / 128;
-    }
-
-    private int cubeScaleColor(int r, int g, int b) {
-        int cubeR = (int) Math.floor(r / 256.0 * 6);
-        int cubeG = (int) Math.floor(g / 256.0 * 6);
-        int cubeB = (int) Math.floor(b / 256.0 * 6);
-
-        return 16 + 36 * cubeR + 6 * cubeG + cubeB;
-    }
 }
