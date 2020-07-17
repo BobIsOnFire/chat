@@ -12,7 +12,7 @@ public abstract class ImageScanner {
     int j = 0;
 
     BufferedImage resize(int width, int height) {
-        final BufferedImage bufferedImage = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        final BufferedImage bufferedImage = new BufferedImage(width, height, image.getType());
         final Graphics2D graphics2D = bufferedImage.createGraphics();
         graphics2D.setComposite(AlphaComposite.Src);
 

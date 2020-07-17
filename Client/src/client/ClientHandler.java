@@ -20,7 +20,6 @@ class ClientHandler {
     private boolean cyrillic;
     private byte cyrillicBegin;
     private boolean pasta;
-    private boolean picmode;
 
     ClientHandler(Socket socket) {
         this.socket = socket;
@@ -62,6 +61,14 @@ class ClientHandler {
                     receiver.line = receiver.lines + 1;
                 }
                 if (str.trim().equals("/unpasta")) pasta = false;
+
+                if (str.trim().startsWith("/console")) {
+                    String[] tokens = str.trim().split("\\s+");
+                    if (tokens.length < 3) continue;
+                    receiver.lines = Integer.parseInt(tokens[1]);
+                    receiver.columns = Integer.parseInt(tokens[2]);
+                    receiver.print( String.format("Размер консоли изменен. Новая высота - %s, ширина - %s\n", tokens[1], tokens[2]) );
+                }
 
                 out.println(str);
             }

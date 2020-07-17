@@ -9,6 +9,7 @@ public class AnsiImageScanner extends ImageScanner {
 
     public AnsiImageScanner(URL url, int consoleWidth) throws IOException {
         image = ImageIO.read(url);
+        if (image == null) throw new IOException();
 
         if (image.getWidth() > consoleWidth / 2) {
             double ratio = image.getWidth() / (double) consoleWidth * 2;
@@ -41,11 +42,11 @@ public class AnsiImageScanner extends ImageScanner {
     private String charAt(int x, int y, boolean preserveColor) {
         int pixel = image.getRGB(x, y);
 
-        int A = pixel >> 24 & 0x000000FF;
+        int A = pixel >> 24 & 0xFF;
 
-        int B = (pixel & 0x000000FF) * A / 0xFF;
-        int G = (pixel >> 8 & 0x000000FF) * A / 0xFF;
-        int R = (pixel >> 16 & 0x000000FF) * A / 0xFF;
+        int B = (pixel & 0xFF) * A / 0xFF;
+        int G = (pixel >> 8 & 0xFF) * A / 0xFF;
+        int R = (pixel >> 16 & 0xFF) * A / 0xFF;
 
         int color = determineColor(R, G, B);
 

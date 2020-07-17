@@ -9,7 +9,7 @@ import static client.Executor.*;
 
 public class Receiver extends Thread {
     int lines;
-    private int columns;
+    int columns;
     int line = 2;
 
     private String cache;
@@ -57,7 +57,7 @@ public class Receiver extends Thread {
         }
     }
 
-    private void print(String message) {
+    void print(String message) {
         String[] messageLines = (message + " ").split("\n");
         messageLines[0] = cache + messageLines[0];
         cache = messageLines[messageLines.length - 1];
